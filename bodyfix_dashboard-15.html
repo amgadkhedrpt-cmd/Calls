@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BodyFix – داشبورد المرضى والمكالمات</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --red:    #dc2626; --red-dk: #7c2d12; --red-lt: #fee2e2;
+  --amber:  #f97316; --amber-lt: #ffedd5;
+  --green:  #16a34a; --green-lt: #dcfce7;
+  --blue:   #1d4ed8; --blue-lt: #dbeafe;
+  --slate:  #64748b; --bg: #f4f2ef;
+  --card:   #ffffff; --border: #e2ddd6;
+  --text:   #1c1917;  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); direction: rtl; min-height: 100vh; }
+
+/* Header */
+header {
+  background: linear-gradient(135deg, var(--red-dk) 0%, var(--red) 100%);
+  color: white; padding: 18px 28px 14px;
+  display: flex; align-items: center; gap: 14px;
+}
+.logo { font-size: 28px; }
+header h1 { font-size: 1.2rem; font-weight: 800; }
+header p  { font-size: 0.76rem; opacity: .78; margin-top: 2px; }
+
+/* Tab nav */
+.tab-nav {
+  background: white; border-bottom: 2px solid var(--border);
+  display: flex; gap: 0; padding: 0 24px;
+}
+.tab-btn {
+  padding: 12px 22px; font-size: 0.88rem; font-weight: 700;
+  color: var(--slate); border: none; background: none; cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn.active { color: var(--red-dk); border-bottom-color: var(--red); }
+.tab-btn:hover:not(.active) { color: var(--text); }
+
+/* Tab panels */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Upload zone */
+#uploadZone { max-width: 760px; margin: 32px auto; padding: 0 20px; }
+.upload-title { font-size: 1rem; font-weight: 700; color: var(--red-dk); margin-bottom: 16px; text-align: center; }
+.upload-grid  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.upload-card {
+  background: var(--card); border: 2px dashed var(--border);
+  border-radius: var(--radius); padding: 20px 12px; text-align: center;
+  cursor: pointer; transition: border-color .2s, background .2s; position: relative;
+}
+.upload-card:hover { border-color: var(--red); background: #fff5f5; }
+.upload-card.done  { border-color: var(--green); background: var(--green-lt); border-style: solid; }
+.upload-card input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-icon  { font-size: 26px; margin-bottom: 7px; }
+.upload-label { font-size: 0.82rem; font-weight: 700; color: var(--red-dk); }
+.upload-sub   { font-size: 0.71rem; color: var(--slate); margin-top: 3px; }
+.upload-done  { font-size: 0.71rem; color: var(--green); font-weight: 700; margin-top: 5px; display: none; }
+.upload-card.done .upload-done { display: block; }
+
+.window-row { display: flex; gap: 12px; align-items: center; justify-content: center; margin-bottom: 18px; font-size: 0.86rem; flex-wrap: wrap; }
+.window-row label { color: var(--slate); font-weight: 600; }
+.window-row input[type=number] { width: 56px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.86rem; text-align: center; background: white; }
+
+#runBtn {
+  display: block; width: 100%; padding: 13px;
+  background: var(--red); color: white; border: none;
+  border-radius: var(--radius); font-size: 1rem; font-weight: 700; cursor: pointer;
+}
+#runBtn:hover:not(:disabled) { background: var(--red-dk); }
+#runBtn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Results wrapper */
+#resultsWrap { max-width: 1140px; margin: 0 auto; padding: 20px 20px 40px; display: none; }
+
+.btn-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.btn-action {
+  padding: 10px 26px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 700; cursor: pointer;
+}
+.btn-print { background: var(--red-dk); color: white; border: none; }
+.btn-reset { background: white; color: var(--red-dk); border: 1.5px solid var(--red-dk); }
+
+/* Section heading */
+.sec-head {
+  font-size: 1rem; font-weight: 800; color: var(--red-dk);
+  border-right: 4px solid var(--red); padding-right: 10px;
+  margin: 24px 0 14px;
+}
+
+/* KPI grid */
+.kpi-grid { display: grid; gap: 11px; margin-bottom: 20px; }
+.kpi-grid-4 { grid-template-columns: repeat(4,1fr); }
+.kpi-grid-5 { grid-template-columns: repeat(5,1fr); }
+.kpi {
+  background: var(--card); border-radius: var(--radius);
+  padding: 14px 16px; border: 1px solid var(--border);
+  border-top: 4px solid var(--blue);
+}
+.kpi.k-red   { border-top-color: var(--red); }
+.kpi.k-amber { border-top-color: var(--amber); }
+.kpi.k-green { border-top-color: var(--green); }
+.kpi.k-blue  { border-top-color: var(--blue); }
+.kpi.k-slate { border-top-color: var(--slate); }
+.kpi-val { font-size: 1.85rem; font-weight: 900; line-height: 1; }
+.kpi-pct { font-size: 0.82rem; font-weight: 700; color: var(--slate); margin-top: 2px; }
+.kpi-lbl { font-size: 0.7rem; color: var(--slate); margin-top: 4px; font-weight: 600; }
+
+/* Charts */
+.chart-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.chart-card { background: var(--card); border-radius: var(--radius); padding: 16px; border: 1px solid var(--border); }
+.chart-card canvas { max-height: 190px; }
+.chart-title { font-size: 0.83rem; font-weight: 700; color: var(--red-dk); margin-bottom: 10px; }
+
+/* Tables */
+.tbl-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px; overflow: hidden; }
+.tbl-hd {
+  background: var(--red-dk); color: white;
+  padding: 10px 15px; font-size: 0.88rem; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.tbl-hd .tbl-count { font-size: 0.8rem; background: rgba(255,255,255,.2); padding: 2px 8px; border-radius: 99px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.81rem; }
+th { background: #f5efed; color: var(--red-dk); padding: 8px 11px; text-align: right; font-weight: 700; border-bottom: 2px solid var(--border); white-space: nowrap; }
+td { padding: 7px 11px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fdf7f7; }
+.phone { direction: ltr; display: inline-block; font-family: monospace; font-size: 0.79rem; color: var(--blue); }
+
+.badge { display: inline-block; border-radius: 99px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; }
+.b-crit  { background: var(--red);      color: white; }
+.b-high  { background: var(--amber);    color: white; }
+.b-low   { background: #94a3b8;         color: white; }
+.b-green { background: var(--green-lt); color: #166534; }
+.b-amber { background: var(--amber-lt); color: #9a3412; }
+.b-blue  { background: var(--blue-lt);  color: var(--blue); }
+
+.warn-box {
+  background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius);
+  padding: 10px 14px; margin-bottom: 16px; font-size: 0.82rem; color: #7c2d12; line-height: 1.7;
+}
+
+/* divider */
+.divider { border: none; border-top: 2px dashed var(--border); margin: 28px 0; }
+
+@media(max-width:750px) {
+  .upload-grid { grid-template-columns: 1fr; }
+  .kpi-grid-4, .kpi-grid-5 { grid-template-columns: 1fr 1fr; }
+  .chart-row { grid-template-columns: 1fr; }
+}
+@media print {
+  header, .tab-nav, #uploadZone, .btn-row { display: none !important; }
+  .tab-panel { display: block !important; }
+  #resultsWrap { display: block !important; padding: 0; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏥</div>
+  <div>
+    <h1>BodyFix — داشبورد المرضى المتأخرين والمكالمات</h1>
+    <p>ارفع ملف المواعيد + سجل المكالمات واحصل على التحليل الكامل فوراً</p>
+  </div>
+</header>
+
+<!-- Tab nav (shown after results) -->
+<div class="tab-nav" id="tabNav" style="display:none">
+  <button class="tab-btn active" onclick="switchTab('delayed')">📋 المرضى المتأخرين</button>
+  <button class="tab-btn" onclick="switchTab('calls')">📞 تحليل المكالمات</button>
+</div>
+
+<!-- Upload -->
+<div id="uploadZone">
+  <p class="upload-title">📂 ارفع الملفات للبدء</p>
+  <div class="upload-grid">
+    <div class="upload-card" id="cardAppt">
+      <input type="file" id="fileAppt" accept=".xlsx,.xls">
+      <div class="upload-icon">📅</div>
+      <div class="upload-label">ملف المواعيد</div>
+      <div class="upload-sub">Excel (.xlsx)</div>
+      <div class="upload-done">✅ تم الرفع</div>
+    </div>
+    <div class="upload-card" id="cardCalls">
+      <input type="file" id="fileCalls" accept=".csv">
+      <div class="upload-icon">📞</div>
+      <div class="upload-label">سجل المكالمات</div>
+      <div class="upload-sub">CSV من التليفون</div>
+      <div class="upload-done">✅ تم الرفع</div>
+    </div>
+    <div class="upload-card" id="cardPatients">
+      <input type="file" id="filePatients" accept=".xlsx,.xls,.csv">
+      <div class="upload-icon">👥</div>
+      <div class="upload-label">بيانات المرضى</div>
+      <div class="upload-sub">اختياري – أرقام ثانوية</div>
+      <div class="upload-done">✅ تم الرفع</div>
+    </div>
+  </div>
+  <div class="window-row">
+    <label>نافذة التواصل:</label>
+    <input type="number" id="winBefore" value="10" min="0" max="60">
+    <span>دقيقة قبل الموعد</span>
+    <span style="color:#94a3b8">حتى</span>
+    <input type="number" id="winAfter" value="15" min="0" max="60">
+    <span>دقيقة بعده</span>
+  </div>
+  <button id="runBtn" disabled onclick="runAnalysis()">⚡ اعمل التقرير</button>
+</div>
+
+<!-- Results -->
+<div id="resultsWrap">
+  <div class="btn-row">
+    <button class="btn-action btn-print" onclick="window.print()">🖨️ طباعة / PDF</button>
+    <button class="btn-action btn-reset" onclick="resetAll()">↩️ ارفع ملفات جديدة</button>
+  </div>
+
+  <!-- TAB 1: Delayed patients -->
+  <div class="tab-panel active" id="panel-delayed">
+
+    <div class="sec-head">📊 ملخص المرضى المتأخرين</div>
+    <div class="kpi-grid kpi-grid-4" id="kpiDelayed"></div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">حالة التواصل</div>
+        <canvas id="pieDelayed"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">توزيع التأخير</div>
+        <canvas id="barDelay"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">المتأخرون حسب الدكتور</div>
+        <canvas id="barDoctor"></canvas>
+      </div>
+    </div>
+
+    <div id="warnBox"></div>
+
+    <div class="tbl-card" id="tblNC" style="display:none">
+      <div class="tbl-hd">🚨 لم يتم التواصل في الوقت الصح <span class="tbl-count" id="cntNC"></span></div>
+      <table><thead><tr><th>#</th><th>المريض</th><th>الهاتف</th><th>الموعد</th><th>النافذة المطلوبة</th><th>التأخير</th><th>الدكتور</th><th>الأولوية</th></tr></thead>
+      <tbody id="bodyNC"></tbody></table>
+    </div>
+
+    <div class="tbl-card" id="tblNA" style="display:none">
+      <div class="tbl-hd">📵 اتصال بدون رد في الوقت <span class="tbl-count" id="cntNA"></span></div>
+      <table><thead><tr><th>#</th><th>المريض</th><th>الهاتف</th><th>الموعد</th><th>وقت الاتصال</th><th>التأخير</th><th>الدكتور</th></tr></thead>
+      <tbody id="bodyNA"></tbody></table>
+    </div>
+
+    <div class="tbl-card" id="tblRC" style="display:none">
+      <div class="tbl-hd">✅ تم التواصل في الوقت الصح <span class="tbl-count" id="cntRC"></span></div>
+      <table><thead><tr><th>#</th><th>المريض</th><th>الهاتف</th><th>الموعد</th><th>وقت المكالمة</th><th>التأخير</th><th>الدكتور</th></tr></thead>
+      <tbody id="bodyRC"></tbody></table>
+    </div>
+  </div>
+
+  <!-- TAB 2: Call analysis -->
+  <div class="tab-panel" id="panel-calls">
+
+    <div class="sec-head">📞 تحليل المكالمات الكلي</div>
+    <div class="kpi-grid kpi-grid-5" id="kpiCalls"></div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">نوع المكالمات</div>
+        <canvas id="pieCallType"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">نسبة الإجابة على المكالمات الصادرة</div>
+        <canvas id="pieAnswered"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">المكالمات حسب الساعة</div>
+        <canvas id="barHour"></canvas>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="sec-head">🔁 المرضى اللي لم يُعاد الاتصال بهم بعد عدم الرد</div>
+    <div class="kpi-grid kpi-grid-4" id="kpiRetry"></div>
+
+    <div class="tbl-card" id="tblNoRetry">
+      <div class="tbl-hd">⚠️ تم الاتصال بدون رد ولم يُعاد الاتصال <span class="tbl-count" id="cntNoRetry"></span></div>
+      <table><thead><tr><th>#</th><th>الاسم / الرقم</th><th>الهاتف</th><th>عدد المحاولات</th><th>أوقات الاتصال</th><th>آخر محاولة</th><th>هل مريض متأخر؟</th></tr></thead>
+      <tbody id="bodyNoRetry"></tbody></table>
+    </div>
+
+    <div class="tbl-card" id="tblRetried" style="display:none">
+      <div class="tbl-hd">🔄 تم إعادة الاتصال (بعد عدم الرد) <span class="tbl-count" id="cntRetried"></span></div>
+      <table><thead><tr><th>#</th><th>الاسم / الرقم</th><th>الهاتف</th><th>إجمالي المكالمات</th><th>أوقات الاتصال</th><th>النتيجة</th></tr></thead>
+      <tbody id="bodyRetried"></tbody></table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let dataAppt = null, dataCalls = null, dataPatients = null;
+const charts = {};
+
+// ── Upload setup ───────────────────────────────────────────────────────────
+function setupUpload(inputId, cardId, storeKey) {
+  document.getElementById(inputId).addEventListener('change', function(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const card = document.getElementById(cardId);
+    const reader = new FileReader();
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      reader.onload = ev => { window[storeKey] = parseCSV(ev.target.result); card.classList.add('done'); checkReady(); };
+      reader.readAsText(file, 'UTF-8');
+    } else {
+      reader.onload = ev => {
+        const wb = XLSX.read(ev.target.result, {type:'array', cellDates:true});
+        window[storeKey] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:null});
+        card.classList.add('done'); checkReady();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  });
+}
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g,''));
+    const obj = {}; headers.forEach((h,i) => obj[h] = vals[i]||null); return obj;
+  });
+}
+setupUpload('fileAppt','cardAppt','dataAppt');
+setupUpload('fileCalls','cardCalls','dataCalls');
+setupUpload('filePatients','cardPatients','dataPatients');
+function checkReady() { document.getElementById('runBtn').disabled = !(dataAppt && dataCalls); }
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const normPhone = ph => { if (!ph) return null; const d = String(ph).replace(/\D/g,''); return d.length>=9 ? d.slice(-9) : d; };
+const parseDur  = d => { const m = String(d||'').match(/(\d+)/); return m ? +m[1] : 0; };
+function parseCallDt(row) {
+  try { return new Date((row['Date']||'').trim()+' '+(row['Time']||'').trim()); } catch { return null; }
+}
+const fmt = d => d ? d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+const fmtW = (a,b) => `${fmt(a)} – ${fmt(b)}`;
+const prio = d => d>15 ? '<span class="badge b-crit">حرج</span>' : d>5 ? '<span class="badge b-high">عالية</span>' : '<span class="badge b-low">منخفضة</span>';
+const pct = (a,b) => b ? Math.round(a/b*100)+'%' : '0%';
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['delayed','calls'][i]===name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+name));
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+function runAnalysis() {
+  const winBefore = +document.getElementById('winBefore').value || 10;
+  const winAfter  = +document.getElementById('winAfter').value  || 15;
+
+  // --- Parse calls ---
+  const callsParsed = dataCalls.map(r => ({
+    num: normPhone(r['Number']),
+    dt:  parseCallDt(r),
+    dur: parseDur(r['Duration']),
+    type: (r['Type']||'').trim(),
+    name: (r['Name:']||'').trim()
+  }));
+
+  // --- Delayed patients ---
+  const delayed = [];
+  for (const row of dataAppt) {
+    const start = new Date(row['Start']);
+    const ci    = row['Checked In'] ? new Date(row['Checked In']) : null;
+    if (!ci) continue;
+    const delayMin = (ci - start)/60000;
+    if (delayMin <= 0) continue;
+    const ph1 = normPhone(row['Phone Number']);
+    let ph2 = null;
+    if (dataPatients && row['Patient ID']) {
+      const pid = String(row['Patient ID']).replace(/\D/g,'');
+      const pr = dataPatients.find(p => String(p['Patient ID']||p['patient_id']||'').replace(/\D/g,'')===pid);
+      if (pr) ph2 = normPhone(pr['Phone 2']||pr['phone_2']||pr['Secondary Phone']||null);
+    }
+    delayed.push({ patient: row['Patient'], phone: row['Phone Number'], ph1, ph2, delay: delayMin, doctor: row['Doctor'], start, row });
+  }
+  delayed.sort((a,b) => b.delay - a.delay);
+
+  // --- Match delayed vs calls ---
+  const delayedNorms = new Set(delayed.flatMap(d => [d.ph1,d.ph2].filter(Boolean)));
+  const delayedResults = []; const outsideWindow = [];
+  for (const pat of delayed) {
+    const wS = new Date(pat.start - winBefore*60000), wE = new Date(pat.start.getTime() + winAfter*60000);
+    const phones = [pat.ph1,pat.ph2].filter(Boolean);
+    const allC = callsParsed.filter(c => phones.includes(c.num));
+    const inW  = allC.filter(c => c.dt && c.dt>=wS && c.dt<=wE);
+    const ansW = inW.filter(c => c.dur>0);
+    const outW = allC.filter(c => c.dt && (c.dt<wS||c.dt>wE) && c.dur>0);
+    let status = ansW.length>0 ? 'reached' : inW.length>0 ? 'no_answer' : 'not_contacted';
+    delayedResults.push({ ...pat, status, wS, wE, inW, ansW, outW });
+    if (status==='not_contacted' && outW.length>0) outsideWindow.push({ ...pat, outW });
+  }
+
+  // --- Call log stats ---
+  const totalCalls    = callsParsed.length;
+  const outgoing      = callsParsed.filter(c => c.type==='Outgoing');
+  const incoming      = callsParsed.filter(c => c.type==='Incomming');
+  const missed        = callsParsed.filter(c => c.type==='Missed');
+  const outAns        = outgoing.filter(c => c.dur>0);
+  const outNoAns      = outgoing.filter(c => c.dur===0);
+  const incAns        = incoming.filter(c => c.dur>0);
+
+  // --- Retry analysis ---
+  const byNum = {};
+  for (const c of callsParsed) {
+    if (!c.num) continue;
+    if (!byNum[c.num]) byNum[c.num] = { calls:[], name:'' };
+    byNum[c.num].calls.push(c);
+    if (c.name && c.name!=='Unknown') byNum[c.num].name = c.name;
+  }
+
+  const retryStats = [];
+  for (const [num, {calls, name}] of Object.entries(byNum)) {
+    const sorted = calls.slice().sort((a,b) => (a.dt||0)-(b.dt||0));
+    const answered   = sorted.filter(c=>c.dur>0);
+    const unanswered = sorted.filter(c=>c.dur===0);
+    if (unanswered.length===0) continue;
+    let retried=false, retriedAnswered=false;
+    for (const uc of unanswered) {
+      const later = sorted.filter(c => c.dt && uc.dt && c.dt > uc.dt);
+      if (later.length>0) { retried=true; if (later.some(c=>c.dur>0)) retriedAnswered=true; }
+    }
+    const isDelayed = delayedNorms.has(num);
+    retryStats.push({ num, name, totalCalls:sorted.length, answered:answered.length, unanswered:unanswered.length, retried, retriedAnswered, isDelayed, times: sorted.map(c=>fmt(c.dt)), lastAttempt: sorted.at(-1)?.dt });
+  }
+
+  const noRetry    = retryStats.filter(r => r.unanswered>0 && !r.retried);
+  const retriedOk  = retryStats.filter(r => r.unanswered>0 && r.retried);
+  const delayedNoContact = delayed.filter(d => delayedResults.find(r=>r.patient===d.patient&&r.status==='not_contacted'));
+
+  // ── RENDER ─────────────────────────────────────────────────────────────
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('tabNav').style.display = 'flex';
+  document.getElementById('resultsWrap').style.display = 'block';
+
+  // -- TAB 1 KPIs --
+  const reached = delayedResults.filter(r=>r.status==='reached');
+  const noAns   = delayedResults.filter(r=>r.status==='no_answer');
+  const notC    = delayedResults.filter(r=>r.status==='not_contacted');
+  document.getElementById('kpiDelayed').innerHTML = `
+    <div class="kpi k-red"><div class="kpi-val">${notC.length}</div><div class="kpi-pct">${pct(notC.length,delayed.length)}</div><div class="kpi-lbl">لم يتم التواصل</div></div>
+    <div class="kpi k-amber"><div class="kpi-val">${noAns.length}</div><div class="kpi-pct">${pct(noAns.length,delayed.length)}</div><div class="kpi-lbl">اتصال بدون رد</div></div>
+    <div class="kpi k-green"><div class="kpi-val">${reached.length}</div><div class="kpi-pct">${pct(reached.length,delayed.length)}</div><div class="kpi-lbl">تم التواصل ✓</div></div>
+    <div class="kpi"><div class="kpi-val">${delayed.length}</div><div class="kpi-lbl">إجمالي المتأخرين</div></div>`;
+
+  // -- TAB 1 Charts --
+  destroyChart('pieDelayed');
+  charts.pieDelayed = new Chart(document.getElementById('pieDelayed'),{
+    type:'doughnut',
+    data:{ labels:[`لم يتم (${notC.length})`,`بدون رد (${noAns.length})`,`تم التواصل (${reached.length})`],
+      datasets:[{data:[notC.length,noAns.length,reached.length], backgroundColor:['#dc2626','#f97316','#16a34a'], hoverOffset:5}] },
+    options:{ plugins:{legend:{position:'bottom',labels:{font:{size:10}}}} , cutout:'52%'}
+  });
+
+  const bins=['1–5','6–10','11–15','16–20','+20']; const bD=[0,0,0,0,0];
+  delayedResults.forEach(r=>{ if(r.delay<=5)bD[0]++; else if(r.delay<=10)bD[1]++; else if(r.delay<=15)bD[2]++; else if(r.delay<=20)bD[3]++; else bD[4]++; });
+  destroyChart('barDelay');
+  charts.barDelay = new Chart(document.getElementById('barDelay'),{
+    type:'bar', data:{labels:bins,datasets:[{data:bD,backgroundColor:['#86efac','#fde68a','#fdba74','#fca5a5','#f87171'],borderRadius:4}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  const docMap={};
+  delayedResults.forEach(r=>{ const d=r.doctor||'غير محدد'; docMap[d]=(docMap[d]||0)+1; });
+  const docLabels=Object.keys(docMap).sort((a,b)=>docMap[b]-docMap[a]).slice(0,8);
+  destroyChart('barDoctor');
+  charts.barDoctor = new Chart(document.getElementById('barDoctor'),{
+    type:'bar', data:{labels:docLabels,datasets:[{data:docLabels.map(d=>docMap[d]),backgroundColor:'#fca5a5',borderRadius:4}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  // -- warn box --
+  const wb2 = document.getElementById('warnBox');
+  if (outsideWindow.length>0) {
+    wb2.innerHTML = `<div class="warn-box">⚠️ <strong>اتصال خارج نافذة الوقت (لا يُحسب):</strong><ul style="margin-top:6px;padding-right:18px;line-height:1.9">${outsideWindow.map(p=>`<li><strong>${p.patient}</strong> — موعده ${fmt(p.start)}، الاتصال كان ${p.outW.map(c=>fmt(c.dt)).join('، ')}</li>`).join('')}</ul></div>`;
+  } else { wb2.innerHTML=''; }
+
+  // -- tables delayed --
+  renderTbl('tblNC','bodyNC','cntNC', notC, r=>`<tr><td>${notC.indexOf(r)+1}</td><td>${r.patient}</td><td><span class="phone">${r.phone||'—'}</span></td><td>${fmt(r.start)}</td><td style="font-size:.76rem;color:#64748b">${fmtW(r.wS,r.wE)}</td><td><b>${r.delay.toFixed(1)} د</b></td><td>${r.doctor||'—'}</td><td>${prio(r.delay)}</td></tr>`);
+  renderTbl('tblNA','bodyNA','cntNA', noAns, r=>`<tr><td>${noAns.indexOf(r)+1}</td><td>${r.patient}</td><td><span class="phone">${r.phone||'—'}</span></td><td>${fmt(r.start)}</td><td style="font-size:.76rem;color:#9a3412">${r.inW.map(c=>fmt(c.dt)).join('، ')}</td><td><b>${r.delay.toFixed(1)} د</b></td><td>${r.doctor||'—'}</td></tr>`);
+  renderTbl('tblRC','bodyRC','cntRC', reached, r=>`<tr><td>${reached.indexOf(r)+1}</td><td>${r.patient}</td><td><span class="phone">${r.phone||'—'}</span></td><td>${fmt(r.start)}</td><td style="font-size:.76rem;color:#166534">${r.ansW.map(c=>fmt(c.dt)+' ('+c.dur+'ث)').join('، ')}</td><td><b>${r.delay.toFixed(1)} د</b></td><td>${r.doctor||'—'}</td></tr>`);
+
+  // -- TAB 2 KPIs calls --
+  document.getElementById('kpiCalls').innerHTML = `
+    <div class="kpi"><div class="kpi-val">${totalCalls}</div><div class="kpi-lbl">إجمالي المكالمات</div></div>
+    <div class="kpi k-blue"><div class="kpi-val">${outgoing.length}</div><div class="kpi-pct">${pct(outgoing.length,totalCalls)}</div><div class="kpi-lbl">مكالمات صادرة</div></div>
+    <div class="kpi k-green"><div class="kpi-val">${outAns.length}</div><div class="kpi-pct">${pct(outAns.length,outgoing.length)} من الصادرة</div><div class="kpi-lbl">صادرة – تم الرد</div></div>
+    <div class="kpi k-red"><div class="kpi-val">${outNoAns.length}</div><div class="kpi-pct">${pct(outNoAns.length,outgoing.length)} من الصادرة</div><div class="kpi-lbl">صادرة – لم يُرد</div></div>
+    <div class="kpi k-amber"><div class="kpi-val">${missed.length}</div><div class="kpi-pct">${pct(missed.length,totalCalls)}</div><div class="kpi-lbl">مكالمات فائتة (واردة)</div></div>`;
+
+  // -- TAB 2 Charts --
+  destroyChart('pieCallType');
+  charts.pieCallType = new Chart(document.getElementById('pieCallType'),{
+    type:'doughnut',
+    data:{labels:[`صادرة (${outgoing.length})`,`واردة (${incoming.length})`,`فائتة (${missed.length})`],
+      datasets:[{data:[outgoing.length,incoming.length,missed.length],backgroundColor:['#60a5fa','#34d399','#f87171'],hoverOffset:5}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},cutout:'52%'}
+  });
+
+  destroyChart('pieAnswered');
+  charts.pieAnswered = new Chart(document.getElementById('pieAnswered'),{
+    type:'doughnut',
+    data:{labels:[`تم الرد (${outAns.length})`,`لم يُرد (${outNoAns.length})`],
+      datasets:[{data:[outAns.length,outNoAns.length],backgroundColor:['#16a34a','#dc2626'],hoverOffset:5}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},cutout:'52%'}
+  });
+
+  const hourMap={};
+  callsParsed.forEach(c=>{ if(!c.dt) return; const h=c.dt.getHours(); hourMap[h]=(hourMap[h]||0)+1; });
+  const hours=Array.from({length:24},(_,i)=>i).filter(h=>hourMap[h]);
+  destroyChart('barHour');
+  charts.barHour = new Chart(document.getElementById('barHour'),{
+    type:'bar',
+    data:{labels:hours.map(h=>`${h}:00`),datasets:[{data:hours.map(h=>hourMap[h]||0),backgroundColor:'#93c5fd',borderRadius:4}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  // -- Retry KPIs --
+  document.getElementById('kpiRetry').innerHTML = `
+    <div class="kpi k-red"><div class="kpi-val">${noRetry.length}</div><div class="kpi-pct">${pct(noRetry.length,retryStats.length)} من أرقام بدون رد</div><div class="kpi-lbl">لم يُعاد الاتصال بهم</div></div>
+    <div class="kpi k-green"><div class="kpi-val">${retriedOk.length}</div><div class="kpi-pct">${pct(retriedOk.length,retryStats.length)}</div><div class="kpi-lbl">أُعيد الاتصال بهم</div></div>
+    <div class="kpi k-amber"><div class="kpi-val">${noRetry.filter(r=>r.isDelayed).length}</div><div class="kpi-lbl">منهم مرضى متأخرون</div></div>
+    <div class="kpi"><div class="kpi-val">${retryStats.length}</div><div class="kpi-lbl">إجمالي أرقام بدون رد</div></div>`;
+
+  // -- No retry table --
+  document.getElementById('cntNoRetry').textContent = noRetry.length;
+  document.getElementById('bodyNoRetry').innerHTML = noRetry.map((r,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${r.name || '—'}</td>
+      <td><span class="phone">${r.num}</span></td>
+      <td><b>${r.unanswered}</b> محاولة</td>
+      <td style="font-size:.77rem;color:#64748b">${r.times.join('، ')}</td>
+      <td style="font-size:.77rem">${r.lastAttempt?fmt(r.lastAttempt):'—'}</td>
+      <td>${r.isDelayed?'<span class="badge b-crit">متأخر ✓</span>':'<span class="badge b-low">لا</span>'}</td>
+    </tr>`).join('');
+
+  // -- Retried table --
+  if (retriedOk.length>0) {
+    document.getElementById('tblRetried').style.display='block';
+    document.getElementById('cntRetried').textContent = retriedOk.length;
+    document.getElementById('bodyRetried').innerHTML = retriedOk.map((r,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${r.name||'—'}</td>
+        <td><span class="phone">${r.num}</span></td>
+        <td>${r.totalCalls}</td>
+        <td style="font-size:.77rem;color:#64748b">${r.times.join('، ')}</td>
+        <td>${r.retriedAnswered?'<span class="badge b-green">تم الوصول ✓</span>':'<span class="badge b-amber">لم يُرد رغم الإعادة</span>'}</td>
+      </tr>`).join('');
+  }
+}
+
+function renderTbl(cardId, bodyId, countId, data, rowFn) {
+  if (!data.length) { document.getElementById(cardId).style.display='none'; return; }
+  document.getElementById(cardId).style.display='block';
+  document.getElementById(countId).textContent = data.length;
+  document.getElementById(bodyId).innerHTML = data.map(rowFn).join('');
+}
+
+function destroyChart(id) { if(charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function resetAll() {
+  dataAppt=dataCalls=dataPatients=null;
+  ['cardAppt','cardCalls','cardPatients'].forEach(id=>document.getElementById(id).classList.remove('done','active'));
+  ['fileAppt','fileCalls','filePatients'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('uploadZone').style.display='block';
+  document.getElementById('tabNav').style.display='none';
+  document.getElementById('resultsWrap').style.display='none';
+  document.getElementById('runBtn').disabled=true;
+  Object.keys(charts).forEach(k=>destroyChart(k));
+}
+</script>
+</body>
+</html>
